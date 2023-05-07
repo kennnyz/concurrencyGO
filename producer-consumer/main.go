@@ -7,13 +7,19 @@ import (
 	"time"
 )
 
-const NumberOfPizza = 13
+const NumberOfPizza = 10
 
 var pizzaMade, pizzaFailed, total int
 
 type Producer struct {
 	data chan PizzaOrder
 	quit chan chan error
+}
+
+func (p *Producer) Close() error {
+	ch := make(chan error)
+	p.quit <- ch
+	return <-ch
 }
 
 type PizzaOrder struct {
@@ -29,7 +35,17 @@ func pizzeria(pizzaMaker *Producer) {
 	for {
 		// try to make a pizza
 		currentPizza := makePizza(i)
-		// desicion
+		if currentPizza != nil {
+			i = currentPizza.pizzaOrder
+			select {
+			case pizzaMaker.data <- *currentPizza:
+
+			case quitChan := <-pizzaMaker.quit:
+				close(pizzaMaker.data)
+				close(quitChan)
+				return
+			}
+		}
 	}
 }
 
@@ -68,7 +84,9 @@ func makePizza(pizzaNumber int) *PizzaOrder {
 			success:    success,
 		}
 	}
-	return nil
+	return &PizzaOrder{
+		pizzaOrder: pizzaNumber,
+	}
 }
 
 func main() {
@@ -82,6 +100,27 @@ func main() {
 	}
 	// run the producer
 	go pizzeria(pizzaJob)
+
+	// create a consumer
+
+	for i := range pizzaJob.data {
+		if i.pizzaOrder <= NumberOfPizza {
+			if i.success {
+				color.Green(i.message)
+				color.Green("Order #%d is out of delivery! ", i.pizzaOrder)
+			} else {
+				color.Red(i.message)
+				color.Red("The customer is really mad! ")
+
+			}
+		} else {
+			color.Cyan("Done making pizzas ")
+			err := pizzaJob.Close()
+			if err != nil {
+				color.Red("Error closing chanel! ", err)
+			}
+		}
+	}
 
 	// print the result
 }
