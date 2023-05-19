@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/fatih/color"
 	"math/rand"
 	"time"
+
+	"github.com/fatih/color"
 )
 
 const NumberOfPizza = 10
